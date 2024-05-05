@@ -1,0 +1,714 @@
+---
+title: Nextjs搭建个人博客
+date: "2024-04-06"
+spoiler: Nextjs
+---
+
+我很喜欢[Anthony Fu](https://antfu.me/)的博客设计，简单的黑白灰配色，同时首页还有随机的梅花生长动画作为背景，左上角的 SVG 签名动画，动画过渡的主题切换，都透露着简约但不简单的感觉。了解到该博客是使用[Nuxt](https://github.com/nuxt/nuxt)创建的后，因为工作我使用 React 比较多，便决定使用[Nextjs](https://nextjs.org/)实现一个同样简约风的博客。
+
+技术选型:
+
+- Nextjs
+- Typescript
+- tailwindcss
+- MDXRemote
+
+部署:
+
+- vercel
+
+## 项目文件结构：
+
+```txt
+|-- minimalist-blog-nextjs
+    |--public
+        |-- fonts              字体文件
+    |-- app
+    |   |-- favicon.ico
+    |   |-- globals.css
+    |   |-- layout.tsx
+    |   |-- loading.svg        loadingSVG
+    |   |-- loading.tsx        loading组件
+    |   |-- page.tsx           首页
+    |   |-- blogs
+    |       |-- page.tsx        博客列表
+    |       |-- loading.svg     博客加载SVG
+    |       |-- loading.tsx     博客加载动画
+    |       |-- [slug]         博客详情
+    |           |-- layout.tsx
+    |           |-- markdown.css
+    |           |-- page.tsx
+    |-- components
+    |   |-- blogList
+    |   |   |-- index.tsx      博客列表
+    |   |-- header
+    |   |   |-- index.tsx      顶部header
+    |   |-- homeLink
+    |   |   |-- index.tsx      顶部导航
+    |   |-- ThemeContent
+    |   |   |-- index.tsx      页面主题切换Provider
+    |   |-- ThemeSwitch
+    |       |-- index.tsx      页面主题切换开关
+    |-- data
+    |   |-- post.ts           处理博客数据(博客列表、博客详情)
+    |-- lib
+    |   |-- utils.ts
+    |-- posts                 写博客的地方
+        |-- 博客文件夹1
+        |   |-- index.mdx
+        |-- 博客文件夹2
+            |-- components.js
+            |-- index.mdx
+
+
+
+```
+
+因为之前博客分别用过 Vupress、Vitepress 以及[Docusaurus](https://docusaurus.io/)构建，比较喜欢这种将 markdown 存于项目中，通过读取文件的方式来渲染 markdown，而 nextjs 服务端组件恰好支持这种需求。
+
+## 博客首页
+
+layout 文件代码(src/app/layout.tsx)
+
+```tsx
+import "./globals.css";
+
+import ThemeContent from "@/components/ThemeContent";
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className=" flex flex-col items-center  bg-[--bg] text-[--text]">
+        <ThemeContent children={children} />
+      </body>
+    </html>
+  );
+}
+```
+
+### 主题切换
+
+这里查看了 Anthony Fu 博客中主题切换的过渡动画，发现在切换的过程中发现其页面`html`标签下出现了一个名为`view-transition`的伪类。
+<img
+  src="/images/view-transition.png"
+  alt="view-transition.png"
+/>
+查阅后下，这是[View Transitions API](https://developer.mozilla.org/zh-CN/docs/Web/API/View_Transitions_API)的产物，这里先不过多展开探讨，先把主题切换过渡给实现出来。
+
+虽然 Nextjs 自带 darkmode，但是并不能支持主题动态切换，所以我这里使用[next-themes](https://github.com/pacocoursey/next-themes)的客户端组件来控制博客的主题切换功能。
+
+ThemeContent 文件代码(src/components/ThemeContent/index.tsx)
+
+```tsx
+"use client";
+
+import { ThemeProvider as NextThemeProvider } from "next-themes";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import Header from "../header/header";
+import Arrow from "./arrow.svg";
+
+const ThemeContent: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [backVisible, setBackVisible] = useState<boolean>(false);
+  const topRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const io = useRef<IntersectionObserver>(
+    new IntersectionObserver((entries) => {
+      if (entries[0]) {
+        setBackVisible(!entries[0].isIntersecting);
+      } else {
+        setBackVisible(false);
+      }
+    }),
+  );
+
+  useEffect(() => {
+    if (topRef.current) {
+      io.current.observe(topRef.current);
+    }
+
+    return () => {
+      io.current.disconnect();
+    };
+  }, []);
+
+  const handleBackTop = () => {
+    mainRef.current &&
+      mainRef.current.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+  };
+
+  return (
+    <NextThemeProvider themes={["dark", "light"]}>
+      <button
+        className={`fixed bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full opacity-30 transition-all hover:bg-[var(--tagBg)] hover:text-[var(--title)] hover:opacity-100 ${backVisible ? "visible" : "hidden"}`}
+        onClick={handleBackTop}
+      >
+        <Arrow />
+      </button>
+      <Header />
+      <main
+        ref={mainRef}
+        className=" mt-[24px] h-[calc(100vh-48px)] max-w-[48rem] overflow-auto"
+      >
+        <div ref={topRef} className=" h-[1px] w-full"></div>
+        {children}
+      </main>
+    </NextThemeProvider>
+  );
+};
+
+export default ThemeContent;
+```
+
+ThemeContent 中还添加了一个返回顶部的按钮，在内容区顶部添加一个宽度占满，高度为 1px 的透明元素，通过[IntersectionObserver API](https://developer.mozilla.org/zh-CN/docs/Web/API/IntersectionObserver)来监听内容区域是否处于顶部，以此来控制返回顶部按钮的显隐。
+
+ThemeSwitch 文件代码(src/components/ThemeSwitch/index.tsx)
+
+```tsx
+"use client";
+import { useTheme } from "next-themes";
+import React, { useEffect, useState } from "react";
+import Sun from "./sun.svg";
+import Moon from "./moon.svg";
+
+const ThemeSwitch: React.FC = () => {
+  const [mounted, setMounted] = useState<boolean>(false);
+  const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const toggleTheme = (
+    event: React.MouseEvent<HTMLInputElement, MouseEvent>,
+  ) => {
+    const x = event.clientX;
+    const y = event.clientY;
+    const endRadius = Math.hypot(
+      Math.max(x, innerWidth - x),
+      Math.max(y, innerHeight - y),
+    );
+
+    let isDark = theme === "dark";
+
+    if (!document.startViewTransition) {
+      setTheme(isDark ? "light" : "dark");
+      return;
+    }
+
+    const transition = document.startViewTransition(async () => {
+      setTheme(isDark ? "light" : "dark");
+    });
+
+    transition.ready.then(() => {
+      const clipPath = [
+        `circle(0px at ${x}px ${y}px)`,
+        `circle(${endRadius}px at ${x}px ${y}px)`,
+      ];
+      document.documentElement.animate(
+        {
+          clipPath: isDark ? [...clipPath].reverse() : clipPath,
+        },
+        {
+          duration: 400,
+          easing: "ease-in",
+          pseudoElement: isDark
+            ? "::view-transition-old(root)"
+            : "::view-transition-new(root)",
+        },
+      );
+    });
+  };
+
+  if (!mounted) {
+    return null;
+  }
+  return (
+    <label className="relative flex justify-center cursor-pointer hover:text-[var(--title)] transition-all">
+      {theme === "dark" ? <Moon /> : <Sun />}
+      <input
+        className=" absolute hidden"
+        type="checkbox"
+        onClick={(event) => toggleTheme(event)}
+      />
+    </label>
+  );
+};
+
+export default ThemeSwitch;
+
+```
+
+ThemeSwitch 可以根据自己喜好放在博客任意位置，我这里就添加到页头最右侧。
+
+过渡动画的实现还需要在 global.css 添加 View Transitions 的伪类样式设置
+
+```css
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+[data-theme="dark"]::view-transition-old(root) {
+  z-index: 1;
+}
+[data-theme="dark"]::view-transition-new(root) {
+  z-index: 999;
+}
+
+::view-transition-old(root) {
+  z-index: 999;
+}
+::view-transition-new(root) {
+  z-index: 1;
+}
+```
+
+至于首页就是十分纯粹的TSX文件渲染的页面。
+
+## 博客列表
+
+
+渲染博客列表之前需要先拿到博客列表数据。 我将所有的mdx文件放在项目中的 posts 文件夹中(src/app/posts)。每一篇博客创建一个文件夹，文件夹中包含一个 index.mdx 文件，index.mdx 就是写博客的地方。
+交互组件在当前文件夹中编写的组件代码，最后通过公共的 components 文件统一导出所有组件。
+
+
+page 文件代码(src/app/blogs/page.tsx)
+
+```tsx
+import BlogList from "@/components/blogList/list";
+
+export default function BlogPage() {
+  return <BlogList />;
+}
+```
+
+这里我将 component 单独抽离到 app 路径外，你可以更好的管理你的组件。app 文件下的文件都是页面文件。这样划分，职责功能更加清晰。
+
+BlogList 组件(src/components/blogList/list.tsx)
+
+```tsx
+export default async function BlogList() {
+  return <div className="relative -top-[10px] flex flex-col gap-8">...</div>;
+}
+```
+
+接下来就需要获取博客列表数据，新建 data 文件夹(src/app/data/post.ts)，这里集中处理读取博客内容，获取到博客列表信息，和博客详情。可以理解为数据库操作。
+
+读取全部文章数据：
+
+post 文件代码(src/app/data/post.ts)
+
+```ts
+import path from "path";
+import fs from "fs";
+import matter from "gray-matter";
+import { pinyin } from "pinyin-pro";
+import { isChinese } from "@/lib/utils";
+
+export interface PostDetail {
+  meta: {
+    title: string;
+    date: string;
+    spoiler: string;
+    slug: string;
+    id: string;
+  };
+  content: string;
+}
+
+const rootDirectory = path.join(process.cwd(), "src", "posts");
+
+/**
+ *
+ * @description 读取全部文章数据
+ */
+export const getPostBySlug = async (dir: string) => {
+  const filePath = path.join(rootDirectory, dir, "/index.mdx");
+
+  const fileContent = fs.readFileSync(filePath, { encoding: "utf8" });
+
+  const { data } = matter(fileContent);
+
+  const id = isChinese(dir)
+    ? pinyin(dir, {
+        toneType: "none",
+        separator: "-",
+      })
+    : dir;
+
+  return {
+    meta: { ...data, slug: dir, id },
+    content: fileContent,
+  } as PostDetail;
+};
+
+export const getAllPostsMeta = async () => {
+  const dirs = fs
+    .readdirSync(rootDirectory, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  let datas = await Promise.all(
+    dirs.map(async (dir) => {
+      const { meta, content } = await getPostBySlug(dir);
+      return { meta, content };
+    }),
+  );
+
+  datas.sort((a, b) => {
+    return Date.parse(a.meta.date) < Date.parse(b.meta.date) ? 1 : -1;
+  });
+  return datas;
+};
+/**
+ *
+ * @description 获取文章详情方法
+ */
+export async function getPost(slug: string) {
+  const posts = await getAllPostsMeta();
+  if (!slug) throw new Error("not found");
+  const post = posts.find((post) => post.meta.slug === slug);
+  if (!post) {
+    throw new Error("not found");
+  }
+  return post;
+}
+
+
+```
+
+BlogList 文件代码(src/components/BlogList/index.tsx)
+
+```tsx
+import Link from "next/link";
+import { getAllPostsMeta, PostDetail } from "@/data/post";
+import dayjs from "dayjs";
+
+export default async function BlogList() {
+  const posts = await getAllPostsMeta();
+
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+
+  const postMap: Map<number, PostDetail[]> = new Map();
+
+  posts.forEach(({ content, meta }) => {
+    const date = dayjs(meta.date);
+    const month = monthNames[date.month()];
+    const year = date.year();
+    const newPost = {
+      content,
+      meta: {
+        ...meta,
+        date: `${month} ${date.get("dates")}`,
+      },
+    };
+    if (postMap.has(year)) {
+      postMap.get(year)!.push(newPost);
+    } else {
+      postMap.set(year, [newPost]);
+    }
+  });
+
+  return (
+    <div className="init-aniamtion relative flex flex-col gap-16 pt-6">
+      {[...postMap.entries()].map(([year, posts]) => (
+        <div className="flex flex-col gap-4">
+          <div className="year-title">{year}</div>
+          <div className="flex flex-col gap-8">
+            {(posts as PostDetail[]).map((post) => {
+              return (
+                <Link
+                  className="block text-[var(--infoText)] transition-all hover:text-[var(--title)]"
+                  key={post.meta.id}
+                  href={"/blogs/" + post.meta.slug + "/"}
+                >
+                  <article className="flex items-baseline gap-4">
+                    <div className="text-[16px] font-bold ">
+                      {post.meta.title}
+                    </div>
+                    <p className="text-[13px] text-[var(--title)] opacity-50">
+                      {post.meta.date}
+                    </p>
+                  </article>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+```
+
+## 博客详情
+
+首页博客列表实现完了，接下来就是博客详情页面，渲染 mdx 文件内容，首推 nextjs 官方的 MDXRemote 组件，最重要的就是它支持引入自己编写的组件，这样就可以实现博客中的组件交互效果。
+
+博客详情是 nextjs 动态路由最好的应用场景，你可以通过动态路由来渲染不同的博客详情页面。创建动态路由文件(src/app/blogs/[slug]/layout.tsx)。博客详情作为新页面自然是必须 layout 包裹的，所以在这里引入 layout 组件。
+
+```tsx
+export default function DetailLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      {children}
+      <footer className="mt-12">
+    
+      </footer>
+    </>
+  );
+}
+```
+
+博客详情页面代码(src/app/blogs/[slug]/page.tsx)
+
+```tsx
+import { getAllPostsMeta, getPost } from "@/data/post";
+import { MDXRemote } from "next-mdx-remote/rsc";
+import rehypePrettyCode from "rehype-pretty-code";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+
+import "./markdown.css";
+import { getPostWords, readingTime } from "@/lib/utils";
+
+export async function generateStaticParams() {
+  const metas = await getAllPostsMeta();
+  return metas.map((post) => {
+    return { slug: post.meta.slug };
+  });
+}
+
+export default async function PostPage({
+  params,
+}: {
+  params: { slug: string };
+}) {
+  const post = await getPost(params.slug);
+  let postComponents = {};
+
+  try {
+    postComponents = await import(
+      "../../../posts/" + params.slug + "/components.js"
+    );
+  } catch (e: any) {
+    if (!e || e.code !== "MODULE_NOT_FOUND") {
+      throw e;
+    }
+  }
+
+  const words = getPostWords(post.content);
+  const readTime = readingTime(words);
+
+  return (
+    <article className="init-aniamtion">
+      <h1
+        className={[
+          "text-[40px] font-black leading-[44px] text-[--title]",
+        ].join(" ")}
+      >
+        {post.meta.title}
+      </h1>
+      <p className="mb-6 mt-2 text-[13px] text-[var(--infoText)] ">
+        {new Date(post.meta.date).toLocaleDateString("cn", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })}
+      </p>
+
+      <p className="mt-2 text-[13px] text-[var(--infoText)] ">字数：{words}</p>
+      <p className="mt-2 text-[13px] text-[var(--infoText)]">
+        预计阅读时间：{readTime}分钟
+      </p>
+      <div className="markdown init-aniamtion mt-10">
+        <MDXRemote
+          source={post?.content || ""}
+          components={{
+            ...postComponents,
+          }}
+          options={{
+            parseFrontmatter: true,
+            mdxOptions: {
+              // @ts-ignore
+              remarkPlugins: [remarkMath],
+              rehypePlugins: [
+                // @ts-ignore
+                rehypeKatex,
+                [
+                  // @ts-ignore
+                  rehypePrettyCode,
+                  {
+                    theme: {
+                      light: "light-plus",
+                      dark: "dark-plus",
+                    },
+                  },
+                  // { theme: "dark-plus" },
+                ],
+              ],
+            },
+          }}
+        />
+      </div>
+    </article>
+  );
+}
+
+```
+
+
+文章 markdown 渲染美化 css
+
+```css
+.markdown {
+  line-height: 28px;
+  --path: none;
+  --radius-top: 19px;
+  --radius-bottom: 19px;
+  --padding-top: 1rem;
+  --padding-bottom: 1rem;
+}
+
+.markdown a {
+  @apply border-b-[1px] border-[rgba(125,125,125,.3)] text-[--link] transition-all hover:border-[--link];
+}
+
+.markdown p {
+  @apply pb-8;
+}
+
+.markdown hr {
+  @apply pt-8 opacity-60 dark:opacity-10;
+}
+
+.markdown h2 {
+  @apply mt-2 pb-8 text-3xl font-bold;
+}
+
+.markdown h3 {
+  @apply mt-2 pb-8 text-2xl font-bold;
+}
+
+.markdown h4 {
+  @apply mt-2 pb-8 text-xl font-bold;
+}
+
+.markdown :not(pre) > code {
+  border-radius: 10px;
+  background: var(--inlineCode-bg);
+  color: var(--inlineCode-text);
+  padding: 0.15em 0.2em 0.05em;
+  white-space: normal;
+}
+
+.markdown pre {
+  @apply -mx-4 mb-8 overflow-y-auto p-4 text-sm;
+  clip-path: var(--path);
+  margin-left: 0;
+  margin-right: 0;
+  border-top-right-radius: var(--radius-top);
+  border-top-left-radius: var(--radius-top);
+  border-bottom-right-radius: var(--radius-bottom);
+  border-bottom-left-radius: var(--radius-bottom);
+  padding-top: var(--padding-top);
+  padding-bottom: var(--padding-bottom);
+  background-color: var(--code-bg);
+}
+
+.markdown pre code {
+  width: auto;
+}
+
+.markdown blockquote {
+  @apply relative -left-2 -ml-4 mb-8 pl-4;
+  font-style: italic;
+  border-left: 3px solid hsla(0, 0%, 0%, 0.9);
+  border-left-color: inherit;
+  opacity: 0.8;
+}
+
+.markdown blockquote p {
+  margin: 0;
+  padding: 0;
+}
+
+.markdown p img {
+  margin-bottom: 0;
+}
+
+.markdown ul {
+  margin-top: 0;
+  padding-bottom: 0;
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0;
+  margin-bottom: 1.75rem;
+  list-style-position: outside;
+  list-style-image: none;
+  list-style: disc;
+}
+
+.markdown li {
+  margin-bottom: calc(1.75rem / 2);
+}
+
+.markdown img {
+  @apply mb-8;
+  max-width: 100%;
+}
+
+.markdown pre [data-highlighted-line] {
+  margin-left: -16px;
+  padding-left: 12px;
+  border-left: 4px solid #ffa7c4;
+  background-color: #022a4b;
+  display: block;
+  padding-right: 1em;
+  padding-left: 1em;
+}
+
+code[data-theme*=" "],
+code[data-theme*=" "] span {
+  color: var(--shiki-light);
+  background-color: var(----code-bg);
+}
+
+[data-theme="dark"] {
+  code[data-theme*=" "],
+  code[data-theme*=" "] span {
+    color: var(--shiki-dark);
+    background-color: var(--code-bg);
+  }
+  .markdown pre {
+    background-color: var(--code-bg);
+  }
+}
+
+```

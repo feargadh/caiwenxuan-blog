@@ -1,0 +1,20 @@
+.logo {
+  font-size: 32px;
+}
+.logo path {
+  animation: logo linear infinite 6000ms;
+  stroke-dasharray: 133 133;
+}
+
+@keyframes logo {
+  0%,
+  10%,
+  100% {
+    
+    stroke-dashoffset: 133;
+  }
+  40%,
+  60% {
+    stroke-dashoffset: 0;
+  }
+}
