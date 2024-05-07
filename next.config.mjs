@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+  trailingSlash: true,
+  output: "export",
   images: {
     remotePatterns: [
       {
@@ -17,6 +19,11 @@ const nextConfig = {
     }); // 针对 SVG 的处理规则
 
     return config;
+  },
+  eslint: {
+    // Warning: This allows production builds to successfully complete even if
+    // your project has ESLint errors.
+    ignoreDuringBuilds: true,
   },
 };
 

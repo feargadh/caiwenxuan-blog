@@ -1,8 +1,8 @@
 export default function Home() {
   return (
     <div className="aboutme max-w-42 h-full overflow-x-hidden px-7 init-aniamtion">
-      <div className="mb-4 text-[36px] text-[var(--title)]">Caiwenxuan</div>
-      <p>Hey, I am Caiwenxuan, a web developer from China.</p>
+      <div className="mb-4 text-[36px] text-[var(--title)]">Nanacai</div>
+      <p>Hey, I am Nanacai, a web developer from China.</p>
       <p>
         This is my blog, recording some of problem, some of interesting demo or
         daily. I used to create blogs by{" "}

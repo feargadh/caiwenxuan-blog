@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { usePathname } from "next/navigation";
 // import Logo from "./cai.svg";
-import C from "./Cai.svg";
+import Nnc from "./nnc.svg";
 import "./index.css";
 
 export default function HomeLink() {
@@ -24,7 +24,7 @@ export default function HomeLink() {
           color: "var(--headerColor)",
         }}
       >
-        <C className="logo"/>
+        <Nnc className="logo" />
         {/* <Logo /> */}
       </div>
     </Link>

@@ -3,7 +3,7 @@
 }
 .logo path {
   animation: logo linear infinite 6000ms;
-  stroke-dasharray: 133 133;
+  stroke-dasharray: 72;
 }
 
 @keyframes logo {
@@ -11,10 +11,10 @@
   10%,
   100% {
     
-    stroke-dashoffset: 133;
+    stroke-dashoffset: 72;
   }
   40%,
   60% {
-    stroke-dashoffset: 0;
+    stroke-dashoffset: 144;
   }
 }

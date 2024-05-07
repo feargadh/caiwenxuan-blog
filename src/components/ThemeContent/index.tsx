@@ -9,23 +9,22 @@ const ThemeContent: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [backVisible, setBackVisible] = useState<boolean>(false);
   const topRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
-  const io = useRef<IntersectionObserver>(
-    new IntersectionObserver((entries) => {
-      if (entries[0]) {
-        setBackVisible(!entries[0].isIntersecting);
-      } else {
-        setBackVisible(false);
-      }
-    }),
-  );
+  const io = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     if (topRef.current) {
+      io.current = new IntersectionObserver((entries) => {
+        if (entries[0]) {
+          setBackVisible(!entries[0].isIntersecting);
+        } else {
+          setBackVisible(false);
+        }
+      });
       io.current.observe(topRef.current);
     }
 
     return () => {
-      io.current.disconnect();
+      io.current && io.current.disconnect();
     };
   }, []);
 
