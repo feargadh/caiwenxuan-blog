@@ -20,13 +20,13 @@ const Header: React.FC = () => {
           <BlogsIcon />
           Blogs
         </Link>
-        <Link
+        {/* <Link
           className="flex cursor-pointer items-center gap-[4px] transition-all hover:text-[var(--title)]"
           href={"/demos"}
         >
           <DemosIcon />
           Demos
-        </Link>
+        </Link> */}
 
         <Link
           className="flex cursor-pointer items-center gap-[4px] transition-all hover:text-[var(--title)]"

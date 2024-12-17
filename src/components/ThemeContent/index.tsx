@@ -47,7 +47,7 @@ const ThemeContent: React.FC<{ children: ReactNode }> = ({ children }) => {
       <Header />
       <main
         ref={mainRef}
-        className=" mt-[24px] h-[calc(100vh-48px)] max-w-[48rem] overflow-auto"
+        className=" mt-[24px] h-[calc(100vh-48px)] max-w-[90vw] overflow-auto "
       >
         <div ref={topRef} className=" h-[1px] w-full"></div>
         {children}

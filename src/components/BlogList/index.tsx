@@ -40,11 +40,14 @@ export default async function BlogList() {
     }
   });
 
+  
+
   return (
-    <div className="init-aniamtion relative flex flex-col gap-16 pt-6">
+    <div className="init-aniamtion relative w-[65ch] flex flex-col gap-16 pt-6">
+      <h2 className="text-4xl">Blogs</h2>
       {[...postMap.entries()].map(([year, posts]) => (
-        <div className="flex flex-col gap-4">
-          <div className="year-title">{year}</div>
+        <div className="flex flex-col gap-4 relative">
+          <div className="text-8xl opacity-15 absolute translate-y-[-2rem] z-[-1] isolate">{year}</div>
           <div className="flex flex-col gap-8">
             {(posts as PostDetail[]).map((post) => {
               return (
@@ -54,10 +57,10 @@ export default async function BlogList() {
                   href={"/blogs/" + post.meta.slug + "/"}
                 >
                   <article className="flex items-baseline gap-4">
-                    <div className="text-[16px] font-bold ">
+                    <div className="text-xl font-bold ">
                       {post.meta.title}
                     </div>
-                    <p className="text-[13px] text-[var(--title)] opacity-50">
+                    <p className=" text-[var(--title)] opacity-50">
                       {post.meta.date}
                     </p>
                   </article>

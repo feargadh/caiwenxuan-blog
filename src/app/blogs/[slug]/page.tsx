@@ -36,7 +36,7 @@ export default async function PostPage({
   const readTime = readingTime(words);
 
   return (
-    <article className="init-aniamtion">
+    <article className="init-aniamtion max-w-[65ch]">
       <h1
         className={[
           "text-[40px] font-black leading-[44px] text-[--title]",

@@ -16,7 +16,7 @@ export default function HomeLink() {
         "inline-block text-2xl font-black",
         isActive ? "" : "hover:scale-[1.02]",
       ].join(" ")}
-      href="/"
+      href="/blogs"
     >
       <div
         className=" logo text-[104px]"
